@@ -1,15 +1,23 @@
 package com.dynasty.cfb.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -17,20 +25,51 @@ import com.dynasty.cfb.data.*
 import com.dynasty.cfb.domain.SeasonEngine
 import com.dynasty.cfb.editor.EditorValidator
 
+/**
+ * Rebuilt Season Standings & Top 25 Poll Screen matching screenshot 1000158306_acf699.png.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SeasonStandingsAndPollsScreen(state: CareerState) {
     var tabIndex by remember { mutableStateOf(0) }
     var selectedConfId by remember { mutableStateOf(state.conferences.first().id) }
+    val userCol = state.colleges.find { it.id == state.userCollegeId } ?: state.colleges.first()
 
-    Column(modifier = Modifier.fillMaxSize().background(NavyBackground).padding(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-            listOf("Top 25 Poll", "Conf Standings", "My Schedule", "Playoff / Bowls").forEachIndexed { idx, label ->
-                FilterChip(
-                    selected = tabIndex == idx,
-                    onClick = { tabIndex = idx },
-                    label = { Text(label, fontSize = 11.sp) }
-                )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NavyBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        // Top Icon Pill Tabs
+        val tabs = listOf(
+            Triple(0, "Top 25 Poll", Icons.Default.Assessment),
+            Triple(1, "Conf Standings", Icons.Default.EmojiEvents),
+            Triple(2, "My Schedule", Icons.Default.DateRange),
+            Triple(3, "Playoff", Icons.Default.Star)
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 10.dp)) {
+            items(tabs) { (idx, label, icon) ->
+                val active = tabIndex == idx
+                Box(
+                    modifier = Modifier
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (active) Brush.horizontalGradient(listOf(Color(0xFF059669), Color(0xFF10B981)))
+                            else Brush.horizontalGradient(listOf(NavyCard, NavyCard))
+                        )
+                        .border(1.2.dp, if (active) TurfGreen else BorderBlue, RoundedCornerShape(12.dp))
+                        .clickable { tabIndex = idx }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, contentDescription = null, tint = if (active) Color.White else TextMuted, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (active) Color.White else TextMuted)
+                    }
+                }
             }
         }
 
@@ -39,23 +78,176 @@ fun SeasonStandingsAndPollsScreen(state: CareerState) {
                 val top25 = remember(state.colleges) {
                     state.colleges.filter { it.pollRank <= 25 }.sortedBy { it.pollRank }
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(top25, key = { it.id }) { col ->
-                        DynastyCard(accentColor = if (col.id == state.userCollegeId) TurfGreen else Color.Transparent) {
+
+                // National Rankings Summary Hero Card
+                DynastyCard(accentColor = BorderBlue) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1.4f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("#${col.pollRank}", fontWeight = FontWeight.Black, fontSize = 18.sp, color = ChampionshipGold, modifier = Modifier.width(42.dp))
-                                CollegeLogo2D(college = col, size = 36.dp)
+                                Icon(
+                                    Icons.Default.SportsFootball,
+                                    contentDescription = null,
+                                    tint = TurfGreen,
+                                    modifier = Modifier.size(34.dp)
+                                )
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("${col.name} ${col.mascot}", fontWeight = FontWeight.Bold, color = TextWhite)
-                                    Text("Prestige ${col.prestigeScore} • PF ${col.pointsFor} / PA ${col.pointsAgainst}", fontSize = 12.sp, color = TextMuted)
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("WEEK ${state.currentWeek}", fontSize = 13.sp, fontWeight = FontWeight.Black, color = TurfGreen)
+                                        Text("  •  NATIONAL RANKINGS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("Top 25 Poll", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextWhite)
                                 }
-                                Text("${col.wins}-${col.losses}", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = TurfGreen)
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LinearProgressIndicator(
+                                    progress = { (state.currentWeek / 18f).coerceIn(0.1f, 1f) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    color = TurfGreen,
+                                    trackColor = NavySurface
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("25 / 25", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = TurfGreen, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Top 25 teams this week", fontSize = 12.sp, color = TextMuted)
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .width(1.dp)
+                                .height(86.dp)
+                                .background(BorderBlue)
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DateRange, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text("Season", fontSize = 10.sp, color = TextMuted)
+                                    Text("Week ${state.currentWeek}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text("Next Poll", fontSize = 10.sp, color = TextMuted)
+                                    Text("Week ${(state.currentWeek + 1).coerceAtMost(18)}", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = TurfGreen, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text("Your Rank", fontSize = 10.sp, color = TextMuted)
+                                    Text(if (userCol.pollRank <= 25) "#${userCol.pollRank}" else "NR", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextWhite)
+                                }
                             }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+                    items(top25, key = { it.id }) { col ->
+                        val isFirst = col.pollRank == 1
+                        val isUser = col.id == state.userCollegeId
+                        DynastyCard(
+                            accentColor = if (isFirst || isUser) TurfGreen else BorderBlue
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Left Rank Badge Box (#1 with crown, #2, #3...)
+                                Box(
+                                    modifier = Modifier
+                                        .width(50.dp)
+                                        .height(64.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF1F2421))
+                                        .border(
+                                            1.5.dp,
+                                            if (isFirst) ChampionshipGold else ChampionshipGold.copy(alpha = 0.4f),
+                                            RoundedCornerShape(12.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            "#${col.pollRank}",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 19.sp,
+                                            color = ChampionshipGold
+                                        )
+                                        if (isFirst) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            CrownVectorIcon(tint = ChampionshipGold, size = 14.dp)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Center Logo + Glowing Green Record Pill underneath
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CollegeLogo2D(college = col, size = 56.dp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(TurfGreen)
+                                            .padding(horizontal = 10.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            "${col.wins}-${col.losses}",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 11.sp,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                // School Name, Mascot, Prestige, PF/PA
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(col.name, fontWeight = FontWeight.Black, fontSize = 17.sp, color = TextWhite)
+                                    Text(col.mascot, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = TextWhite)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Prestige ${col.prestigeScore}   •   PF ${col.pointsFor} / PA ${col.pointsAgainst}",
+                                        fontSize = 12.sp,
+                                        color = TextMuted
+                                    )
+                                }
+
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextMuted)
+                            }
+                        }
+                    }
+                    item {
+                        StadiumWireframeFooter(showTagline = true)
+                    }
+                }
             }
+
             1 -> {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
                     items(state.conferences) { conf ->
@@ -69,44 +261,59 @@ fun SeasonStandingsAndPollsScreen(state: CareerState) {
                 val standings = remember(state.colleges, selectedConfId) {
                     SeasonEngine.sortConferenceStandings(state.colleges, selectedConfId)
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                     items(standings, key = { it.id }) { col ->
-                        DynastyCard(accentColor = if (col.id == state.userCollegeId) TurfGreen else Color.Transparent) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        DynastyCard(accentColor = if (col.id == state.userCollegeId) TurfGreen else BorderBlue) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    CollegeLogo2D(college = col, size = 34.dp)
+                                    CollegeLogo2D(college = col, size = 40.dp)
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
-                                        Text(col.name, fontWeight = FontWeight.Bold, color = TextWhite)
-                                        Text("Diff: ${col.pointsFor - col.pointsAgainst}", fontSize = 11.sp, color = TextMuted)
+                                        Text("${col.name} ${col.mascot}", fontWeight = FontWeight.Bold, color = TextWhite)
+                                        Text("PF ${col.pointsFor} / PA ${col.pointsAgainst} (Diff: ${col.pointsFor - col.pointsAgainst})", fontSize = 11.sp, color = TextMuted)
                                     }
                                 }
-                                Text("Conf: ${col.confWins}-${col.confLosses} | All: ${col.wins}-${col.losses}", fontWeight = FontWeight.Bold, color = ChampionshipGold, fontSize = 13.sp)
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("Conf: ${col.confWins}-${col.confLosses}", fontWeight = FontWeight.Black, color = TurfGreen, fontSize = 13.sp)
+                                    Text("Overall: ${col.wins}-${col.losses}", fontWeight = FontWeight.SemiBold, color = ChampionshipGold, fontSize = 12.sp)
+                                }
                             }
                         }
                     }
                 }
             }
+
             2 -> {
                 val userGames = remember(state.schedule, state.userCollegeId) {
                     state.schedule.filter { it.homeCollegeId == state.userCollegeId || it.awayCollegeId == state.userCollegeId }
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                     items(userGames, key = { it.id }) { g ->
                         val isHome = g.homeCollegeId == state.userCollegeId
                         val oppId = if (isHome) g.awayCollegeId else g.homeCollegeId
                         val opp = state.colleges.find { it.id == oppId }
                         DynastyCard {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column {
-                                    Text("Week ${g.week} • ${g.titleLabel}", fontSize = 11.sp, color = ChampionshipGold)
-                                    Text("${if (isHome) "vs" else "@"} ${opp?.name ?: "Opponent"} (${opp?.wins ?: 0}-${opp?.losses ?: 0})", fontWeight = FontWeight.Bold, color = TextWhite)
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (opp != null) {
+                                        CollegeLogo2D(college = opp, size = 40.dp)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                    }
+                                    Column {
+                                        Text("Week ${g.week} • ${g.titleLabel}", fontSize = 11.sp, color = ChampionshipGold, fontWeight = FontWeight.Bold)
+                                        Text("${if (isHome) "vs" else "@"} ${opp?.name ?: "Opponent"} (${opp?.wins ?: 0}-${opp?.losses ?: 0})", fontWeight = FontWeight.ExtraBold, color = TextWhite)
+                                    }
                                 }
                                 if (g.played) {
                                     val userWon = (isHome && g.homeScore >= g.awayScore) || (!isHome && g.awayScore > g.homeScore)
                                     Text(
                                         "${if (userWon) "W" else "L"} ${g.homeScore}-${g.awayScore}",
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp,
                                         color = if (userWon) TurfGreen else CrimsonAlert
                                     )
                                 } else {
@@ -117,6 +324,7 @@ fun SeasonStandingsAndPollsScreen(state: CareerState) {
                     }
                 }
             }
+
             3 -> {
                 val postGames = remember(state.schedule) {
                     state.schedule.filter { it.week >= 13 }
@@ -124,23 +332,26 @@ fun SeasonStandingsAndPollsScreen(state: CareerState) {
                 Text(
                     "Configured Playoff Size: ${state.settings.playoffTeamsCount}-Team Bracket",
                     color = ChampionshipGold,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 if (postGames.isEmpty()) {
                     DynastyCard {
-                        Text("Conference Championships (Week 13) and the ${state.settings.playoffTeamsCount}-Team Playoff & Bowls (Weeks 14-17) are seeded automatically after Week 12.", color = TextMuted)
+                        Text(
+                            "Conference Championships (Week 13) and the ${state.settings.playoffTeamsCount}-Team Playoff & Bowls (Weeks 14-17) are seeded automatically after Week 12.",
+                            color = TextMuted
+                        )
                     }
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                         items(postGames, key = { it.id }) { g ->
                             val h = state.colleges.find { it.id == g.homeCollegeId }
                             val a = state.colleges.find { it.id == g.awayCollegeId }
                             DynastyCard(accentColor = ChampionshipGold) {
                                 Text("Week ${g.week} • ${g.titleLabel}", fontSize = 12.sp, color = ChampionshipGold, fontWeight = FontWeight.Bold)
-                                Text("${a?.name ?: "Away"} vs ${h?.name ?: "Home"}", fontWeight = FontWeight.Bold, color = TextWhite)
+                                Text("${a?.name ?: "Away"} vs ${h?.name ?: "Home"}", fontWeight = FontWeight.ExtraBold, color = TextWhite)
                                 if (g.played) {
-                                    Text("Final: ${a?.abbreviation} ${g.awayScore} - ${h?.abbreviation} ${g.homeScore}", color = TurfGreen, fontWeight = FontWeight.Bold)
+                                    Text("Final: ${a?.abbreviation} ${g.awayScore} - ${h?.abbreviation} ${g.homeScore}", color = TurfGreen, fontWeight = FontWeight.Black)
                                 }
                             }
                         }
@@ -166,7 +377,7 @@ fun TacticsAndSlidersScreen(state: CareerState, viewModel: DynastyViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text("TACTICS, SCHEMES & GAMEPLAN SLIDERS", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite)
+            Text("TACTICS, SCHEMES & GAMEPLAN SLIDERS", fontSize = 18.sp, fontWeight = FontWeight.Black, color = TextWhite)
         }
         item {
             DynastyCard {
@@ -217,90 +428,328 @@ fun TacticsAndSlidersScreen(state: CareerState, viewModel: DynastyViewModel) {
                             )
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = TurfGreen)
                 ) {
-                    Text("SAVE GAMEPLAN TACTICS", color = Color.Black, fontWeight = FontWeight.ExtraBold)
+                    Text("SAVE GAMEPLAN TACTICS", color = Color.Black, fontWeight = FontWeight.Black)
                 }
             }
         }
     }
 }
 
+/**
+ * Rebuilt Athletic Department & Facilities (Office) Screen matching screenshot 1000158307_acf699.png.
+ */
 @Composable
 fun FinancesStaffAndOffersScreen(state: CareerState, viewModel: DynastyViewModel) {
     val userCol = state.colleges.find { it.id == state.userCollegeId } ?: state.colleges.first()
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(NavyBackground).padding(12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NavyBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 1. Header with Temple Icon & Subtitle
         item {
-            DynastyCard(accentColor = TurfGreen) {
-                Text("ATHLETIC DEPARTMENT & FACILITIES", fontWeight = FontWeight.ExtraBold, color = TextWhite, fontSize = 16.sp)
-                Text("Available Budget: $${userCol.budgetMillions}M • NIL Collective: $${userCol.nilPoolMillions}M", color = ChampionshipGold, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { viewModel.upgradeFacility("TRAINING") }, modifier = Modifier.weight(1f)) {
-                        Text("Training Lvl ${userCol.trainingFacilityLevel}\n($3.5M)", fontSize = 11.sp, color = Color.Black)
-                    }
-                    Button(onClick = { viewModel.upgradeFacility("ACADEMIC") }, modifier = Modifier.weight(1f)) {
-                        Text("Academic Lvl ${userCol.academicFacilityLevel}\n($3.5M)", fontSize = 11.sp, color = Color.Black)
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AccountBalance,
+                    contentDescription = null,
+                    tint = TurfGreen,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "ATHLETIC DEPARTMENT & FACILITIES",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                        color = TextWhite
+                    )
+                    Text(
+                        text = "Build your program. Develop your players. Win championships.",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { viewModel.upgradeFacility("MEDICAL") }, modifier = Modifier.weight(1f)) {
-                        Text("Medical Lvl ${userCol.medicalFacilityLevel}\n($3.5M)", fontSize = 11.sp, color = Color.Black)
+            }
+        }
+
+        // 2. Two Side-by-Side Budget & NIL Collective Cards
+        item {
+            DynastyCard(accentColor = BorderBlue, contentPadding = PaddingValues(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(NavySurface)
+                            .border(1.dp, BorderBlue, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = TurfGreen, modifier = Modifier.size(30.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("AVAILABLE BUDGET", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                                Text(
+                                    "$${fmtMillions(userCol.budgetMillions)}M",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TurfGreen
+                                )
+                            }
+                        }
                     }
-                    Button(onClick = { viewModel.upgradeFacility("NIL") }, modifier = Modifier.weight(1f)) {
-                        Text("Boost NIL +Hrs\n($3.5M)", fontSize = 11.sp, color = Color.Black)
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(NavySurface)
+                            .border(1.dp, BorderBlue, RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Groups, contentDescription = null, tint = TurfGreen, modifier = Modifier.size(30.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("NIL COLLECTIVE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                                Text(
+                                    "$${fmtMillions(userCol.nilPoolMillions)}M",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TurfGreen
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // 3. Facility Upgrades 4-Column Tile Grid
         item {
-            Text("COACHING STAFF", fontWeight = FontWeight.ExtraBold, color = ChampionshipGold)
-        }
-        items(state.staff, key = { it.id }) { member ->
-            DynastyCard {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("${member.role}: ${member.name}", fontWeight = FontWeight.Bold, color = TextWhite)
-                        Text("${member.specialty} • Rating: ${member.rating} • Salary: $${member.salaryMillions}M", fontSize = 12.sp, color = TextMuted)
-                    }
-                    OutlinedButton(onClick = { viewModel.upgradeStaffMember(member.id) }) {
-                        Text("Train ($1.5M)", fontSize = 11.sp)
+            DynastyCard(accentColor = BorderBlue) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Build, contentDescription = null, tint = ChampionshipGold, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("FACILITY UPGRADES", fontSize = 14.sp, fontWeight = FontWeight.Black, color = ChampionshipGold)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                data class FacilityTile(val code: String, val title: String, val levelText: String, val icon: ImageVector)
+                val facTiles = listOf(
+                    FacilityTile("TRAINING", "TRAINING", "Lvl ${userCol.trainingFacilityLevel}", Icons.Default.FitnessCenter),
+                    FacilityTile("ACADEMIC", "ACADEMIC", "Lvl ${userCol.academicFacilityLevel}", Icons.Default.School),
+                    FacilityTile("MEDICAL", "MEDICAL", "Lvl ${userCol.medicalFacilityLevel}", Icons.Default.LocalHospital),
+                    FacilityTile("NIL", "BOOST NIL", "+Hrs", Icons.Default.MonetizationOn)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    facTiles.forEach { tile ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(NavySurface)
+                                .border(1.2.dp, TurfGreen.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                                .clickable { viewModel.upgradeFacility(tile.code) }
+                                .padding(horizontal = 6.dp, vertical = 10.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                Icon(tile.icon, contentDescription = tile.title, tint = TurfGreen, modifier = Modifier.size(24.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "${tile.title} ${tile.levelText}",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = TextWhite,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
+                                ) {
+                                    Text("$3.5M", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextWhite)
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // 4. Coaching Staff Section with Headset Avatars
         item {
-            Text("COACHING CAROUSEL JOB OFFERS", fontWeight = FontWeight.ExtraBold, color = ChampionshipGold)
-        }
-        if (state.pendingJobOffers.isEmpty()) {
-            item {
-                DynastyCard {
-                    Text("Job offers from other universities arrive at the end of the Postseason (Week 18 Offseason).", color = TextMuted, fontSize = 12.sp)
+            DynastyCard(accentColor = BorderBlue) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.People, contentDescription = null, tint = ChampionshipGold, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("COACHING STAFF", fontSize = 14.sp, fontWeight = FontWeight.Black, color = ChampionshipGold)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.staff.forEach { member ->
+                        val shortRole = when {
+                            member.role.contains("Recruit", ignoreCase = true) -> "RC"
+                            else -> member.role.take(2).uppercase()
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(NavySurface)
+                                .border(1.dp, BorderBlue, RoundedCornerShape(14.dp))
+                                .padding(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CoachHeadsetAvatar(roleCode = shortRole, size = 62.dp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(TurfGreen.copy(alpha = 0.16f))
+                                            .border(1.dp, TurfGreen, RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(shortRole, fontSize = 10.sp, fontWeight = FontWeight.Black, color = TurfGreen)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(member.name, fontSize = 16.sp, fontWeight = FontWeight.Black, color = TextWhite)
+                                    Text(member.specialty, fontSize = 12.sp, color = CyanAccent.copy(alpha = 0.85f))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = ChampionshipGold, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Rating ", fontSize = 11.sp, color = TextMuted)
+                                        Text("${member.rating}", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextWhite)
+                                        Text("   |   ", color = BorderBlue)
+                                        Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = ChampionshipGold, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Salary ", fontSize = 11.sp, color = TextMuted)
+                                        Text("$${String.format(java.util.Locale.US, "%.2f", member.salaryMillions)}M", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextWhite)
+                                    }
+                                }
+
+                                // Right Emerald Outlined Action Pill
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(TurfGreen.copy(alpha = 0.14f))
+                                        .border(1.2.dp, TurfGreen, RoundedCornerShape(10.dp))
+                                        .clickable { viewModel.upgradeStaffMember(member.id) }
+                                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            if (shortRole == "RC") Icons.Default.Description else Icons.Default.FitnessCenter,
+                                            contentDescription = null,
+                                            tint = TurfGreen,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            if (shortRole == "RC") "CONTRACT" else "TRAINING",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = TextWhite
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TurfGreen, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        } else {
+        }
+
+        // 5. Coaching Carousel Job Offers Card
+        item {
+            DynastyCard(accentColor = BorderBlue) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CyanAccent.copy(alpha = 0.14f))
+                            .border(1.dp, CyanAccent.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Inbox, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(26.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("COACHING CAROUSEL JOB OFFERS", fontSize = 13.sp, fontWeight = FontWeight.Black, color = ChampionshipGold)
+                        if (state.pendingJobOffers.isEmpty()) {
+                            Text(
+                                "No active offers right now. The offseason will bring new opportunities for your coaching staff.",
+                                fontSize = 12.sp,
+                                color = TextMuted
+                            )
+                        } else {
+                            Text("${state.pendingJobOffers.size} active head coaching offers available below!", fontSize = 12.sp, color = TurfGreen)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NavySurface)
+                            .border(1.dp, CyanAccent.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = CyanAccent)
+                    }
+                }
+            }
+        }
+
+        if (state.pendingJobOffers.isNotEmpty()) {
             items(state.pendingJobOffers, key = { it.collegeId }) { offer ->
                 DynastyCard(accentColor = ChampionshipGold) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Column {
-                            Text("${offer.collegeName} (${"★".repeat(offer.prestigeStars)})", fontWeight = FontWeight.Bold, color = TextWhite)
-                            Text("$${offer.salaryMillions}M/yr (${offer.contractYears} yrs) • NIL Pool $${offer.nilPoolMillions}M", fontSize = 12.sp, color = TextMuted)
+                            Text("${offer.collegeName} (${"★".repeat(offer.prestigeStars)})", fontWeight = FontWeight.Black, color = TextWhite)
+                            Text("$${fmtMillions(offer.salaryMillions)}M/yr (${offer.contractYears} yrs) • NIL Pool $${fmtMillions(offer.nilPoolMillions)}M", fontSize = 12.sp, color = TextMuted)
                         }
                         Button(onClick = { viewModel.acceptJobOffer(offer) }) {
-                            Text("ACCEPT", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text("ACCEPT", color = Color.Black, fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 }
             }
+        }
+
+        item {
+            StadiumWireframeFooter(showTagline = false)
         }
     }
 }
@@ -312,10 +761,10 @@ fun AwardsDraftAndHistoryScreen(state: CareerState) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            Text("TROPHY ROOM & ACHIEVEMENTS", fontWeight = FontWeight.ExtraBold, color = ChampionshipGold, fontSize = 16.sp)
+            Text("TROPHY ROOM & ACHIEVEMENTS", fontWeight = FontWeight.Black, color = ChampionshipGold, fontSize = 16.sp)
         }
         items(state.achievements, key = { it.id }) { ach ->
-            DynastyCard(accentColor = if (ach.unlocked) TurfGreen else Color.Transparent) {
+            DynastyCard(accentColor = if (ach.unlocked) TurfGreen else BorderBlue, showLeftStripe = ach.unlocked) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(ach.title, fontWeight = FontWeight.Bold, color = if (ach.unlocked) TurfGreen else TextWhite)
@@ -327,7 +776,7 @@ fun AwardsDraftAndHistoryScreen(state: CareerState) {
         }
 
         item {
-            Text("DYNASTY YEAR-BY-YEAR HISTORY", fontWeight = FontWeight.ExtraBold, color = ChampionshipGold, fontSize = 16.sp)
+            Text("DYNASTY YEAR-BY-YEAR HISTORY", fontWeight = FontWeight.Black, color = ChampionshipGold, fontSize = 16.sp)
         }
         if (state.seasonHistory.isEmpty()) {
             item { DynastyCard { Text("Complete your first season to log dynasty history.", color = TextMuted) } }
@@ -341,7 +790,7 @@ fun AwardsDraftAndHistoryScreen(state: CareerState) {
         }
 
         item {
-            Text("AWARDS & 1ST ROUND NFL DRAFT PICKS", fontWeight = FontWeight.ExtraBold, color = ChampionshipGold, fontSize = 16.sp)
+            Text("AWARDS & 1ST ROUND NFL DRAFT PICKS", fontWeight = FontWeight.Black, color = ChampionshipGold, fontSize = 16.sp)
         }
         items(state.awardsHistory.take(8)) { aw ->
             DynastyCard {
@@ -363,13 +812,11 @@ fun CustomEditorsScreen(state: CareerState, viewModel: DynastyViewModel) {
     var mode by remember { mutableStateOf(0) }
     val userCol = state.colleges.find { it.id == state.userCollegeId } ?: state.colleges.first()
 
-    // College Editor state
     var colName by remember(userCol) { mutableStateOf(userCol.name) }
     var colMascot by remember(userCol) { mutableStateOf(userCol.mascot) }
     var colAbbr by remember(userCol) { mutableStateOf(userCol.abbreviation) }
     var colPrestige by remember(userCol) { mutableStateOf(userCol.prestigeScore.toString()) }
 
-    // Player Editor state (edits top player on user team)
     val topPlayer = remember(state.players, state.userCollegeId) {
         state.players.filter { it.collegeId == state.userCollegeId }.maxByOrNull { it.overall } ?: state.players.first()
     }
@@ -378,17 +825,15 @@ fun CustomEditorsScreen(state: CareerState, viewModel: DynastyViewModel) {
     var pGpa by remember(topPlayer) { mutableStateOf(topPlayer.gpa.toString()) }
     var pPot by remember(topPlayer) { mutableStateOf(topPlayer.potential.toString()) }
 
-    // Conference Editor state
     val userConf = state.conferences.find { it.id == userCol.conferenceId } ?: state.conferences.first()
     var confName by remember(userConf) { mutableStateOf(userConf.name) }
     var confShort by remember(userConf) { mutableStateOf(userConf.shortName) }
     var confStars by remember(userConf) { mutableStateOf(userConf.prestige.toString()) }
 
-    // JSON Import/Export state
     var jsonBuffer by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize().background(NavyBackground).padding(12.dp)) {
-        Text("IN-GAME EDITORS & JSON IMPORT/EXPORT", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite)
+        Text("IN-GAME EDITORS & JSON IMPORT/EXPORT", fontSize = 17.sp, fontWeight = FontWeight.Black, color = TextWhite)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 8.dp)) {
             listOf("College", "Player", "Conference", "JSON Data").forEachIndexed { idx, label ->
                 FilterChip(selected = mode == idx, onClick = { mode = idx }, label = { Text(label, fontSize = 11.sp) })
@@ -479,7 +924,7 @@ fun SettingsAndSavesScreen(
     ) {
         item {
             DynastyCard {
-                Text("COMPETITION & GAMEPLAY SETTINGS", fontWeight = FontWeight.ExtraBold, color = TurfGreen)
+                Text("COMPETITION & GAMEPLAY SETTINGS", fontWeight = FontWeight.Black, color = TurfGreen)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("College Football Playoff Size:", fontSize = 13.sp, color = TextWhite)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
@@ -534,7 +979,7 @@ fun SettingsAndSavesScreen(
 
         item {
             DynastyCard(accentColor = ChampionshipGold) {
-                Text("MANUAL SAVE TO SLOTS", fontWeight = FontWeight.ExtraBold, color = ChampionshipGold)
+                Text("MANUAL SAVE TO SLOTS", fontWeight = FontWeight.Black, color = ChampionshipGold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     listOf(1, 2, 3).forEach { slot ->
