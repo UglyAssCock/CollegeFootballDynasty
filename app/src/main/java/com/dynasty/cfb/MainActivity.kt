@@ -6,13 +6,14 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,44 +51,68 @@ fun DynastyAppRoot(viewModel: DynastyViewModel = viewModel()) {
         containerColor = NavyBackground,
         topBar = {
             if (banner != null) {
-                Surface(
-                    color = TurfGreen,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { viewModel.clearBanner() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(banner ?: "", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        Text("✕", color = Color.Black, fontWeight = FontWeight.Black)
-                    }
-                }
+                TopStatusBanner(
+                    message = banner ?: "",
+                    onDismiss = { viewModel.clearBanner() }
+                )
             }
         },
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(containerColor = NavySurface) {
-                    val items = listOf(
-                        Triple("hub", "Hub", Icons.Default.Home),
-                        Triple("roster", "Roster", Icons.Default.People),
-                        Triple("recruiting", "Recruit", Icons.Default.Star),
-                        Triple("season", "Season", Icons.Default.EmojiEvents),
-                        Triple("office", "Office", Icons.Default.AccountBalance)
-                    )
-                    items.forEach { (route, label, icon) ->
-                        NavigationBarItem(
-                            selected = currentRoute == route,
-                            onClick = {
-                                navController.navigate(route) {
-                                    launchSingleTop = true
-                                }
-                            },
-                            icon = { Icon(icon, contentDescription = label) },
-                            label = { Text(label, fontSize = 11.sp) }
+                Column(modifier = Modifier.fillMaxWidth().background(NavySurface)) {
+                    HorizontalDivider(color = BorderBlue, thickness = 1.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val items = listOf(
+                            Triple("hub", "Hub", Icons.Default.Home),
+                            Triple("roster", "Roster", Icons.Default.People),
+                            Triple("recruiting", "Recruit", Icons.Default.Star),
+                            Triple("season", "Season", Icons.Default.EmojiEvents),
+                            Triple("office", "Office", Icons.Default.AccountBalance)
                         )
+                        items.forEach { (route, label, icon) ->
+                            val selected = currentRoute == route
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        navController.navigate(route) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (selected) TurfGreen else TextMuted,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    color = if (selected) TurfGreen else TextMuted
+                                )
+                                // Bottom glowing emerald underline bar matching screenshots
+                                Box(
+                                    modifier = Modifier
+                                        .width(42.dp)
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(if (selected) TurfGreen else androidx.compose.ui.graphics.Color.Transparent)
+                                )
+                            }
+                        }
                     }
                 }
             }
